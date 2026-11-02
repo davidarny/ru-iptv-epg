@@ -120,7 +120,7 @@ def main() -> None:
             url = playlist[j] if j < len(playlist) else ""
             cid, hours = match(line)
             extinf = re.sub(r'\s*tvg-id="[^"]*"', "", line)
-            # imgur answers Russian addresses with a "Content not viewable in your region" picture
+            # imgur answers blocked regions (the UK among them) with a "Content not viewable in your region" picture
             # instead of the logo: use the guide's icon when there is one, otherwise no logo.
             if re.search(r'tvg-logo="https?://(i\.)?imgur\.com/', extinf):
                 icon = guide_channels[cid].find("icon") if cid else None
