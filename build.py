@@ -23,7 +23,10 @@ from pathlib import Path
 
 PLAYLIST_URL = "https://iptv-org.github.io/iptv/countries/ru.m3u"
 CHANNELS_URL = "https://iptv-org.github.io/api/channels.json"
-EPG_URL = "https://iptvx.one/epg/epg_lite.xml.gz"
+# epg_noarch has programme descriptions; epg_lite carries titles only.
+EPG_URL = "https://iptvx.one/epg/epg_noarch.xml.gz"
+# iptvx puts U+250A before episode numbers ("СашаТаня ┊ 36"); Kodi's font has no glyph for it.
+SEPARATORS = str.maketrans({"┊": "·"})
 PAST = timedelta(days=1)
 FUTURE = timedelta(days=8)
 
@@ -162,6 +165,9 @@ def main() -> None:
             except (TypeError, ValueError):
                 keep = False
             if keep:
+                for child in el:
+                    if child.text:
+                        child.text = child.text.translate(SEPARATORS)
                 tv.append(el)
                 programmes += 1
                 continue
