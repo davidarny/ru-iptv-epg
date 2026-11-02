@@ -8,6 +8,8 @@ Russian IPTV playlist with a matching TV guide, rebuilt daily by GitHub Actions 
 `build.py` takes the [iptv-org](https://github.com/iptv-org/iptv) Russian playlist, matches each channel to the
 [iptvx.one](https://iptvx.one) guide through the names and alternative names in the iptv-org channel database,
 writes the guide id (and `tvg-shift` for `+N` time-shifted feeds) into the playlist, and cuts the guide down to the
-matched channels, from a day back to eight days ahead. The streams are whatever iptv-org lists; nothing is hosted here.
+matched channels, from a day back to eight days ahead. The guide has no genres, so each programme gets them from
+its title prefix (`т/с`, `х/ф`, `м/ф`…, which is then dropped from the title), the "country, year, genres" tail of
+its description, or the channel's iptv-org category. The streams are whatever iptv-org lists; nothing is hosted here.
 
 Run locally: `python3 build.py dist`.

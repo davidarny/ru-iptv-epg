@@ -30,6 +30,36 @@ SEPARATORS = str.maketrans({"┊": "·"})
 PAST = timedelta(days=1)
 FUTURE = timedelta(days=8)
 
+# The guide has no <category>; Kodi then shows "Other / Unknown". Genres are taken, in order, from the
+# title prefix ("т/с СашаТаня"), the "Country, year, genres" tail of the description, and, failing both,
+# the channel's iptv-org category. Kodi shows a genre it cannot map as the text itself.
+TITLE_PREFIX = {
+    "т/с": "Сериал", "х/ф": "Фильм", "м/ф": "Мультфильм", "м/фы": "Мультфильм", "м/с": "Мультсериал",
+    "д/с": "Документальный сериал", "д/ф": "Документальный фильм", "т/ш": "Шоу",
+}
+DESC_GENRES = re.compile(r",\s*\d{4}\s*,\s*([а-яё][а-яё ,\-]*?)\.?\s*$")
+CHANNEL_GENRE = {
+    "Movies": "Кино", "Music": "Музыка", "Sports": "Спорт", "Kids": "Детям", "Entertainment": "Развлечения",
+    "News": "Новости", "Series": "Сериалы", "Documentary": "Документальное", "Lifestyle": "Стиль жизни",
+    "Travel": "Путешествия", "Outdoor": "Охота и рыбалка", "Culture": "Культура", "Religious": "Религия",
+    "Comedy": "Юмор", "Shop": "Телемагазин", "Cooking": "Кулинария", "Auto": "Авто", "Family": "Семейное",
+    "Education": "Образование", "Classic": "Классика", "Business": "Бизнес", "Animation": "Анимация",
+    "Science": "Наука", "Relax": "Релакс", "Weather": "Погода", "Legislative": "Политика",
+}
+
+
+def genres(title: str, desc: str, channel_genres: list[str]) -> list[str]:
+    found = []
+    prefix = title.split(" ", 1)[0].lower()
+    if prefix in TITLE_PREFIX:
+        found.append(TITLE_PREFIX[prefix])
+    m = DESC_GENRES.search(desc or "")
+    if m:
+        found += [g.strip().capitalize() for g in m.group(1).split(",") if g.strip()]
+    if not found:
+        found = channel_genres
+    return list(dict.fromkeys(found))
+
 
 def fetch(url: str) -> bytes:
     req = urllib.request.Request(url, headers={"User-Agent": "ru-iptv-epg/1.0"})
@@ -109,6 +139,7 @@ def main() -> None:
 
     lines = ['#EXTM3U x-tvg-url="https://raw.githubusercontent.com/davidarny/ru-iptv-epg/data/epg.xml.gz"']
     used = set()
+    channel_genres: dict[str, list[str]] = {}
     total = matched = 0
     i = 0
     while i < len(playlist):
@@ -132,6 +163,9 @@ def main() -> None:
             if cid:
                 matched += 1
                 used.add(cid)
+                group = re.search(r'group-title="([^"]*)"', line)
+                channel_genres.setdefault(cid, [CHANNEL_GENRE[g] for g in (group.group(1) if group else "").split(";")
+                                                if g in CHANNEL_GENRE])
                 attrs = f' tvg-id="{cid}"' + (f' tvg-shift="{hours}"' if hours else "")
                 extinf = extinf.replace("#EXTINF:-1", "#EXTINF:-1" + attrs, 1)
                 # Russian display name from the guide, keeping the HD and +N marks of the original.
@@ -168,6 +202,14 @@ def main() -> None:
                 for child in el:
                     if child.text:
                         child.text = child.text.translate(SEPARATORS)
+                if el.find("category") is None:
+                    for g in genres(el.findtext("title", ""), el.findtext("desc", ""),
+                                    channel_genres.get(el.get("channel"), [])):
+                        ET.SubElement(el, "category", {"lang": "ru"}).text = g
+                # The prefix is now the genre: "т/с Реальные пацаны" -> "Реальные пацаны".
+                for t in el.findall("title"):
+                    if t.text and " " in t.text and t.text.split(" ", 1)[0].lower() in TITLE_PREFIX:
+                        t.text = t.text.split(" ", 1)[1]
                 tv.append(el)
                 programmes += 1
                 continue
